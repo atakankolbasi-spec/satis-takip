@@ -1,8 +1,8 @@
 -- SATIŞ TAKİP otomatik yedekleme
 -- Supabase paneli > SQL Editor'e yapıştırıp bir kez çalıştırın. Tekrar çalıştırmak zararsızdır.
--- Önce supabase/kurulum.sql çalıştırılmış olmalı.
+-- Önce supabase/kurulum.sql ve supabase/giderler.sql çalıştırılmış olmalı.
 --
--- Ne yapar: her gece 05:00'te (Türkiye saati) tüm firma, fiyat, satış ve tahsilat kayıtlarının
+-- Ne yapar: her gece 05:00'te (Türkiye saati) tüm firma, fiyat, satış, tahsilat ve gider kayıtlarının
 -- bir kopyasını st_backups tablosuna yazar. Son 35 günün günlük yedekleri ile her ayın ilk günü
 -- alınan yedekler saklanır. Yedekler sitedeki Yedek sekmesinden görülür, indirilir, geri yüklenir.
 -- Not: Bu yedekler aynı Supabase projesinin içindedir. Projenin kendisi silinirse onlar da gider;
@@ -39,6 +39,9 @@ begin
     'prices',   (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'firm', firm_id, 'menu', menu_id, 'price', price)), '[]'::jsonb) from public.st_prices),
     'sales',    (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'date', date, 'firm', firm_id, 'menu', menu_id, 'qty', qty, 'price', price, 'paid', paid, 'by', by_name) order by date, created_at), '[]'::jsonb) from public.st_sales),
     'payments', (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'date', date, 'firm', firm_id, 'amount', amount, 'method', method, 'note', note, 'by', by_name) order by date, created_at), '[]'::jsonb) from public.st_payments),
+    'suppliers', (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'name', name, 'phone', phone) order by name), '[]'::jsonb) from public.st_suppliers),
+    'expenses', (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'kind', kind, 'date', date, 'supplier', supplier_id, 'category', category, 'desc', description, 'amount', amount, 'by', by_name) order by date, created_at), '[]'::jsonb) from public.st_expenses),
+    'supplierPayments', (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'date', date, 'supplier', supplier_id, 'amount', amount, 'method', method, 'note', note, 'by', by_name) order by date, created_at), '[]'::jsonb) from public.st_supplier_payments),
     'migratedV2', true
   );
 
@@ -48,7 +51,9 @@ begin
     jsonb_build_object(
       'firms', jsonb_array_length(v_payload->'firms'),
       'sales', jsonb_array_length(v_payload->'sales'),
-      'payments', jsonb_array_length(v_payload->'payments')),
+      'payments', jsonb_array_length(v_payload->'payments'),
+      'expenses', jsonb_array_length(v_payload->'expenses'),
+      'supplierPayments', jsonb_array_length(v_payload->'supplierPayments')),
     v_payload)
   returning id into v_id;
 

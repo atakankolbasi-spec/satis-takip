@@ -21,14 +21,16 @@ const ICONS={
  tahsilat:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
  rapor:'<path d="M5 3h10l4 4v14H5zM14 3v5h5M8 13h8M8 17h5"/>',
  yedek:'<path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3"/>',
+ nakit:'<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4M18 10v4"/><circle cx="12" cy="12" r="2.2"/>',
+ gider:'<path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2zM9 8h6M9 12h6"/>',
  hizli:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
  aysonu:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l2 2 4-4"/>',
  kullanici:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3-5.5 6.5-5.5s5.9 2 6.5 5.5M17 11a3 3 0 1 0-1-5.8M18 14.7c2 .6 3.2 2.3 3.5 5.3"/>'
 };
-const VIEWS=[['ozet','Özet'],['satis','Satışlar'],['hizli','Hızlı Giriş'],['firma','Firmalar'],['menu','Menüler'],['fiyat','Özel Fiyatlar'],['cari','Cari Hesap'],['aysonu','Ay Sonu'],['tahsilat','Tahsilatlar'],['rapor','Raporlar'],['yedek','Yedek'],['kullanici','Kullanıcılar']];
+const VIEWS=[['ozet','Özet'],['satis','Satışlar'],['hizli','Hızlı Giriş'],['firma','Firmalar'],['menu','Menüler'],['fiyat','Özel Fiyatlar'],['cari','Cari Hesap'],['aysonu','Ay Sonu'],['tahsilat','Tahsilatlar'],['nakit','Nakit Giderler'],['gider','Firma Giderleri'],['rapor','Raporlar'],['yedek','Yedek'],['kullanici','Kullanıcılar']];
 
 /* ---------- durum ---------- */
-const S={firms:[],menus:[],prices:[],sales:[],payments:[],settings:[],users:[]};
+const S={firms:[],menus:[],prices:[],sales:[],payments:[],settings:[],users:[],suppliers:[],expenses:[],spay:[]};
 const ready={};let dbErr='';
 const U={view:'ozet',date:null,q:'',sort:'bal',from:'',to:'',repFrom:'',repTo:'',payQ:'',qDate:'',qMenu:'',qKey:'',qv:{},month:'',mFilter:'all',sel:{}};
 const dueDays=()=>(S.settings.find(x=>x.id==='app')||{}).dueDays||30;
@@ -53,7 +55,7 @@ const dates=()=>[...new Set(S.sales.map(s=>s.date))].sort();
 /* ---------- yazma ---------- */
 function allowed(col,op){
   if(col==='users')return Auth.owner;
-  if(['firms','menus','prices','settings'].includes(col))return can('admin');
+  if(['firms','menus','prices','settings','suppliers'].includes(col))return can('admin');
   return op==='del'?can('admin'):can('write');
 }
 let toastT;
@@ -205,6 +207,7 @@ function vOzet(){
     <div class="card kpi ok"><small>Toplam tahsilat</small><b class="num">${money(tot.p)}</b><em>${S.payments.length} tahsilat kaydı</em></div>
     <div class="card kpi ${tot.s-tot.p>0?'hot':''}"><small>Açık bakiye</small><b class="num">${money(tot.s-tot.p)}</b><em>${debt.length} firmadan alacak</em></div>
     <div class="card kpi"><small>${ld?DS(ld)+' porsiyon':'Son gün'}</small><b class="num">${int(dayQty)}</b><em>${money(dayAmt)} · ${day.length} firma</em></div>
+    <div class="card kpi"><small>Bu ay gider</small><b class="num">${money(S.expenses.filter(e=>e.date.slice(0,7)===thisMonth()).reduce((a,e)=>a+e.amount,0))}</b><em>nakit ${money(S.expenses.filter(e=>e.kind==='nakit'&&e.date.slice(0,7)===thisMonth()).reduce((a,e)=>a+e.amount,0))} · firma faturası ${money(S.expenses.filter(e=>e.kind==='firma'&&e.date.slice(0,7)===thisMonth()).reduce((a,e)=>a+e.amount,0))}</em></div>
   </div>
   <div class="grid two">
     <section class="card"><header><h2>Alacağı en yüksek firmalar</h2><span>Cari bakiyeye göre</span></header>
@@ -315,16 +318,16 @@ function vRapor(){
   `<div class="grid kpis"><div class="card kpi"><small>Porsiyon</small><b class="num">${int(r.qty)}</b><em>${r.days.length} gün</em></div><div class="card kpi"><small>Satış tutarı</small><b class="num">${money(r.amt)}</b><em>${r.firms.length} firma</em></div><div class="card kpi ok"><small>Tahsilat</small><b class="num">${money(r.paid)}</b><em>aralıkta alınan</em></div><div class="card kpi"><small>Günlük ortalama</small><b class="num">${money(r.days.length?r.amt/r.days.length:0)}</b><em>${int(r.days.length?r.qty/r.days.length:0)} porsiyon</em></div></div>
   <div class="grid two">
   <section class="card"><header><h2>Firma bazında</h2><span>Tutara göre</span></header><div class="tw"><table><thead><tr><th>Firma</th><th class="r">Gün</th><th class="r">Adet</th><th class="r">Tutar</th></tr></thead><tbody>${r.firms.map(f=>`<tr><td>${esc(f.name)}</td><td class="r num">${f.days.size}</td><td class="r num">${int(f.qty)}</td><td class="r num"><b>${money(f.amt)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Bu aralıkta veri yok.</td></tr>'}</tbody></table></div></section>
-  <section class="card"><header><h2>Gün bazında</h2><span>Tarih sırasıyla</span></header><div class="tw"><table><thead><tr><th>Tarih</th><th class="r">Firma</th><th class="r">Adet</th><th class="r">Tutar</th></tr></thead><tbody>${r.days.map(([d,x])=>`<tr><td class="num">${D(d)}</td><td class="r num">${x.f.size}</td><td class="r num">${int(x.qty)}</td><td class="r num"><b>${money(x.amt)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Bu aralıkta veri yok.</td></tr>'}</tbody></table></div></section></div>`;
+  <section class="card"><header><h2>Gün bazında</h2><span>Tarih sırasıyla</span></header><div class="tw"><table><thead><tr><th>Tarih</th><th class="r">Firma</th><th class="r">Adet</th><th class="r">Tutar</th></tr></thead><tbody>${r.days.map(([d,x])=>`<tr><td class="num">${D(d)}</td><td class="r num">${x.f.size}</td><td class="r num">${int(x.qty)}</td><td class="r num"><b>${money(x.amt)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Bu aralıkta veri yok.</td></tr>'}</tbody></table></div></section></div>`+vGelirGider();
 }
 
 /* ---------- bağlantı ---------- */
 const CFG=window.SATIS_CONFIG||{};
 const sb=window.createPCSClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true}});
 const emailFor=u=>String(CFG.emailTemplate||'').replace('{u}',u);
-const TABLE={firms:'st_firms',menus:'st_menus',prices:'st_prices',sales:'st_sales',payments:'st_payments',settings:'st_settings',users:'st_profiles'};
+const TABLE={firms:'st_firms',menus:'st_menus',prices:'st_prices',sales:'st_sales',payments:'st_payments',settings:'st_settings',users:'st_profiles',suppliers:'st_suppliers',expenses:'st_expenses',spay:'st_supplier_payments'};
 const PKCOL={settings:'key'};
-const COLS=['firms','menus','prices','sales','payments','settings','users'];
+const COLS=['firms','menus','prices','sales','payments','settings','users','suppliers','expenses','spay'];
 const fromRow={
   firms:r=>({id:r.id,name:r.name,phone:r.phone||''}),
   menus:r=>({id:r.id,name:r.name}),
@@ -332,6 +335,9 @@ const fromRow={
   sales:r=>({id:r.id,date:r.date,firm:r.firm_id,menu:r.menu_id,qty:r.qty,price:+r.price,paid:+r.paid||0,by:r.by_name||''}),
   payments:r=>({id:r.id,date:r.date,firm:r.firm_id,amount:+r.amount,method:r.method||'',note:r.note||'',by:r.by_name||''}),
   settings:r=>({...(r.value||{}),id:r.key}),
+  suppliers:r=>({id:r.id,name:r.name,phone:r.phone||''}),
+  expenses:r=>({id:r.id,kind:r.kind,date:r.date,supplier:r.supplier_id||'',category:r.category||'',desc:r.description||'',amount:+r.amount,by:r.by_name||''}),
+  spay:r=>({id:r.id,date:r.date,supplier:r.supplier_id,amount:+r.amount,method:r.method||'',note:r.note||'',by:r.by_name||''}),
   users:r=>({id:r.username,uid:r.id,name:r.name,role:r.role,active:r.active,created:String(r.created_at||'').slice(0,10)})
 };
 const toRow={
@@ -340,13 +346,17 @@ const toRow={
   prices:(id,d)=>({id,firm_id:d.firm,menu_id:d.menu,price:d.price}),
   sales:(id,d)=>({id,date:d.date,firm_id:d.firm,menu_id:d.menu,qty:d.qty,price:d.price,paid:d.paid||0,by_name:d.by||''}),
   payments:(id,d)=>({id,date:d.date,firm_id:d.firm,amount:d.amount,method:d.method||'',note:d.note||'',by_name:d.by||''}),
-  settings:(id,d)=>({key:id,value:d})
+  settings:(id,d)=>({key:id,value:d}),
+  suppliers:(id,d)=>({id,name:d.name,phone:d.phone||''}),
+  expenses:(id,d)=>({id,kind:d.kind,date:d.date,supplier_id:d.kind==='firma'?d.supplier:null,category:d.category||'',description:d.desc||'',amount:d.amount,by_name:d.by||''}),
+  spay:(id,d)=>({id,date:d.date,supplier_id:d.supplier,amount:d.amount,method:d.method||'',note:d.note||'',by_name:d.by||''})
 };
 function errMsg(e){
   const c=e&&e.code;
   if(c==='42501'||/row-level security|yetkisiz/i.test((e&&e.message)||''))return 'Bu hesabın bu işlem için yetkisi yok';
   if(c==='23503')return 'Bağlı kayıtlar olduğu için silinemez';
   if(c==='23505')return 'Aynı kayıt zaten var';
+  if(c==='PGRST202'||c==='42883'||c==='42P01'||/schema cache|does not exist/i.test((e&&e.message)||''))return 'Veritabanı kurulumu eksik: supabase/guncelleme.sql çalıştırılmalı';
   if(e&&/Failed to fetch|NetworkError/i.test(e.message||''))return 'İnternet bağlantısı yok';
   return 'İşlem yapılamadı, tekrar deneyin';
 }
@@ -567,8 +577,135 @@ function bulkPayModal(){
       toast(`${n} tahsilat kaydedildi`);return true}});
 }
 
-const RENDER={ozet:vOzet,satis:vSatis,hizli:vHizli,firma:vFirma,menu:vMenu,fiyat:vFiyat,cari:vCari,aysonu:vAysonu,tahsilat:vTahsilat,rapor:vRapor,yedek:vYedek,kullanici:vKullanici};
-const COUNT={satis:()=>S.sales.length,firma:()=>S.firms.length,menu:()=>S.menus.length,tahsilat:()=>S.payments.length,kullanici:()=>S.users.length};
+/* ---------- giderler ---------- */
+const CATS=['Gıda / Malzeme','Yakıt','Personel','Ulaşım','Bakım / Onarım','Kira / Fatura','Vergi / Resmî','Diğer'];
+const sname=id=>(byId(S.suppliers,id)||{}).name||'Silinmiş tedarikçi';
+const sortedSup=()=>[...S.suppliers].sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+const catOpts=sel=>CATS.map(c=>`<option${c===sel?' selected':''}>${esc(c)}</option>`).join('');
+const thisMonth=()=>iso(new Date()).slice(0,7);
+
+function expenseModal(e,kind,sup){
+  const edit=!!(e&&e.id);kind=kind||(e&&e.kind)||'nakit';
+  const sups=sortedSup();
+  if(kind==='firma'&&!sups.length){toast('Önce bir tedarikçi ekleyin');return}
+  const v=e||{date:iso(new Date()),category:CATS[0],desc:'',amount:'',supplier:sup||''};
+  openModal({title:edit?'Gideri düzenle':kind==='nakit'?'Yeni nakit gider':'Yeni firma gideri',submit:edit?'Güncelle':'Gideri kaydet',
+    body:`<div class="fgrid">
+      ${field('Tarih',`<input type="date" name="date" value="${esc(v.date)}" required>`)}
+      ${field('Kategori',`<select name="category">${catOpts(v.category)}</select>`)}
+      ${kind==='firma'?field('Tedarikçi firma',`<select name="supplier" required>${opts(sups,v.supplier,'Seçin')}</select>`,'full'):''}
+      ${field('Tutar (₺)',`<input type="number" name="amount" min="0.01" step="0.01" value="${esc(v.amount)}" required inputmode="decimal">`)}
+      ${field('Açıklama',`<input type="text" name="desc" value="${esc(v.desc)}" placeholder="${kind==='nakit'?'Örn. sebze ve et alımı':'Örn. fatura no 1234'}">`,'full')}
+    </div>`,
+    onSubmit:async d=>{
+      const rec={kind,date:d.date,supplier:kind==='firma'?d.supplier:'',category:d.category,desc:d.desc.trim(),amount:+d.amount,by:byName()};
+      const ok=await put('expenses',edit?e.id:newId(),rec);if(ok)toast(edit?'Gider güncellendi':'Gider kaydedildi');return ok}});
+}
+function spayModal(p,sup){
+  const edit=!!(p&&p.id);const sups=sortedSup();
+  if(!sups.length){toast('Önce bir tedarikçi ekleyin');return}
+  const v=p||{date:iso(new Date()),supplier:sup||'',amount:'',method:'Nakit',note:''};
+  const bal=id=>{const r=supLedger().find(x=>x.s.id===id);return r?`${r.s.name} kalan borcunuz: ${money(r.bal)}`:'Tedarikçi seçin.'};
+  openModal({title:edit?'Ödemeyi düzenle':'Tedarikçiye ödeme',submit:edit?'Güncelle':'Ödemeyi kaydet',
+    body:`<div class="fgrid">
+      ${field('Tarih',`<input type="date" name="date" value="${esc(v.date)}" required>`)}
+      ${field('Tedarikçi firma',`<select name="supplier" required>${opts(sups,v.supplier,'Seçin')}</select>`)}
+      ${field('Tutar (₺)',`<input type="number" name="amount" min="0.01" step="0.01" value="${esc(v.amount)}" required inputmode="decimal">`)}
+      ${field('Yöntem',`<select name="method">${['Nakit','Havale / EFT','Çek','Kredi kartı'].map(m=>`<option${m===v.method?' selected':''}>${m}</option>`).join('')}</select>`)}
+      ${field('Not',`<input type="text" name="note" value="${esc(v.note)}">`,'full')}
+    </div><p class="hint" id="spBal">${bal(v.supplier)}</p>`,
+    onInput:f=>{$('#spBal').textContent=bal(f.supplier.value)},
+    onSubmit:async d=>{
+      const ok=await put('spay',edit?p.id:newId(),{date:d.date,supplier:d.supplier,amount:+d.amount,method:d.method,note:d.note.trim(),by:byName()});
+      if(ok)toast(edit?'Ödeme güncellendi':'Ödeme kaydedildi');return ok}});
+}
+function supModal(s){
+  const edit=!!s;const v=s||{name:'',phone:''};
+  openModal({title:edit?'Tedarikçiyi düzenle':'Yeni tedarikçi',submit:edit?'Güncelle':'Tedarikçiyi ekle',
+    body:`${field('Firma adı',`<input type="text" name="name" value="${esc(v.name)}" required>`)}${field('Telefon',`<input type="tel" name="phone" value="${esc(v.phone)}" placeholder="İsteğe bağlı">`)}`,
+    onSubmit:async d=>{
+      const name=d.name.trim();if(!name)return false;
+      if(S.suppliers.some(x=>x.id!==(s&&s.id)&&tr(x.name)===tr(name))){toast('Bu isimde bir tedarikçi var');return false}
+      const ok=await put('suppliers',edit?s.id:newId(),{name,phone:d.phone.trim()});if(ok)toast(edit?'Tedarikçi güncellendi':'Tedarikçi eklendi');return ok}});
+}
+
+function vNakit(){
+  if(!U.gMonth)U.gMonth=(S.expenses.filter(e=>e.kind==='nakit').map(e=>e.date).sort().pop()||iso(new Date())).slice(0,7);
+  const m=U.gMonth,q=tr(U.gq||''),cat=U.gCat||'';
+  const all=S.expenses.filter(e=>e.kind==='nakit'&&e.date.slice(0,7)===m);
+  const list=all.filter(e=>(!cat||e.category===cat)&&(!q||tr(e.desc+' '+e.category).includes(q))).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0);
+  const tot=list.reduce((a,e)=>a+e.amount,0),days=new Set(list.map(e=>e.date)).size;
+  const by=new Map();all.forEach(e=>by.set(e.category||'Diğer',(by.get(e.category||'Diğer')||0)+e.amount));
+  const cats=[...by.entries()].sort((a,b)=>b[1]-a[1]),maxC=cats[0]?cats[0][1]:1,allTot=all.reduce((a,e)=>a+e.amount,0);
+  const nav=`<div class="seg"><button data-act="g-day" data-id="-1" aria-label="Önceki ay">‹</button><button data-act="g-day" data-id="0">Bu ay</button><button data-act="g-day" data-id="1" aria-label="Sonraki ay">›</button></div><input type="month" id="gMonth" value="${esc(m)}" aria-label="Ay"><select id="gCat" aria-label="Kategori"><option value="">Tüm kategoriler</option>${CATS.map(c=>`<option${c===cat?' selected':''}>${esc(c)}</option>`).join('')}</select><input type="search" id="gq" placeholder="Açıklamada ara" value="${esc(U.gq||'')}" aria-label="Ara">`;
+  return head('Nakit Giderler',`${mLabel(m)} · kasadan yapılan nakit harcamalar`,nav+'<button class="btn" data-act="csv-nakit">CSV</button>'+addBtn('nx-new','Yeni gider'))+
+  `<div class="grid kpis"><div class="card kpi ${allTot>0?'hot':''}"><small>Ay toplamı</small><b class="num">${money(allTot)}</b><em>${all.length} kayıt</em></div><div class="card kpi"><small>Gösterilen</small><b class="num">${money(tot)}</b><em>${list.length} kayıt${cat||q?' (filtreli)':''}</em></div><div class="card kpi"><small>Günlük ortalama</small><b class="num">${money(days?tot/days:0)}</b><em>${days} gün harcama var</em></div><div class="card kpi"><small>En büyük kalem</small><b class="num" style="font-size:18px">${cats[0]?esc(cats[0][0]):'—'}</b><em>${cats[0]?money(cats[0][1]):''}</em></div></div>`+
+  (cats.length?`<section class="card"><header><h2>Kategoriye göre</h2><span>${mLabel(m)}</span></header><div class="bars">${cats.map(([c,v])=>`<div class="bar"><span class="nm" title="${esc(c)}">${esc(c)}</span><div class="track"><div class="fill" style="width:${Math.max(3,v/maxC*100)}%"></div></div><b class="num">${money(v)}</b></div>`).join('')}</div></section>`:'')+
+  (list.length?`<div class="card tw"><table><thead><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th class="r">Tutar</th><th>Giren</th><th></th></tr></thead><tbody>${list.map(e=>`<tr><td class="num">${D(e.date)}</td><td><span class="pill">${esc(e.category||'—')}</span></td><td>${esc(e.desc)}</td><td class="r num"><b>${money(e.amount)}</b></td><td class="by">${esc(e.by||'')}</td><td class="row-actions"><button class="btn ghost" data-act="nx-edit" data-id="${esc(e.id)}">Düzenle</button><button class="btn ghost" data-act="nx-del" data-id="${esc(e.id)}">Sil</button></td></tr>`).join('')}</tbody><tfoot><tr><td colspan="3">Toplam</td><td class="r num">${money(tot)}</td><td></td><td></td></tr></tfoot></table></div>`:emptyCard('Bu ay nakit gider yok','Başka bir ay seçin ya da “Yeni gider” ile ekleyin.'));
+}
+
+function supLedger(){
+  const m=new Map(S.suppliers.map(s=>[s.id,{s,bill:0,paid:0,last:''}]));
+  const g=id=>m.get(id)||(m.set(id,{s:{id,name:sname(id)},bill:0,paid:0,last:''}),m.get(id));
+  S.expenses.filter(e=>e.kind==='firma').forEach(e=>{const r=g(e.supplier);r.bill+=e.amount;if(e.date>r.last)r.last=e.date});
+  S.spay.forEach(p=>{const r=g(p.supplier);r.paid+=p.amount;if(p.date>r.last)r.last=p.date});
+  return [...m.values()].map(r=>({...r,bal:r.bill-r.paid}));
+}
+function supStmt(id,from,to){
+  const mv=[];
+  S.expenses.filter(e=>e.kind==='firma'&&e.supplier===id).forEach(e=>mv.push({date:e.date,k:0,t:'Gider',d:[e.category,e.desc].filter(Boolean).join(' · '),deb:e.amount}));
+  S.spay.filter(p=>p.supplier===id).forEach(p=>mv.push({date:p.date,k:1,t:'Ödeme',d:[p.method,p.note].filter(Boolean).join(' · '),cre:p.amount}));
+  mv.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.k-b.k);
+  let open=0;mv.forEach(m=>{if(from&&m.date<from)open+=(m.deb||0)-(m.cre||0)});
+  const rows=mv.filter(m=>(!from||m.date>=from)&&(!to||m.date<=to));
+  let run=open;rows.forEach(m=>{run+=(m.deb||0)-(m.cre||0);m.run=run});
+  return {rows,open,close:run,deb:rows.reduce((a,m)=>a+(m.deb||0),0),cre:rows.reduce((a,m)=>a+(m.cre||0),0)};
+}
+function supStmtHtml(id){
+  const st=supStmt(id,U.from,U.to);
+  const body=st.rows.length?st.rows.map(m=>`<tr><td class="num">${D(m.date)}</td><td><span class="pill ${m.k?'good':''}">${m.t}</span></td><td>${esc(m.d)}</td><td class="r num">${m.deb?money(m.deb):''}</td><td class="r num">${m.cre?money(m.cre):''}</td><td class="r num ${m.run>0?'neg':'pos'}">${money(m.run)}</td></tr>`).join(''):`<tr><td colspan="6" class="empty">Bu aralıkta hareket yok.</td></tr>`;
+  return `<div class="stmt-top"><div><small>Devir</small><b class="num">${money(st.open)}</b></div><div><small>Gider (fatura)</small><b class="num">${money(st.deb)}</b></div><div><small>Ödeme</small><b class="num">${money(st.cre)}</b></div><div><small>Kalan borç</small><b class="num ${st.close>0?'neg':'pos'}">${money(st.close)}</b></div></div>
+  <div class="tw card"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th class="r">Gider</th><th class="r">Ödeme</th><th class="r">Bakiye</th></tr></thead><tbody>${body}</tbody></table></div>`;
+}
+function openSupStatement(id){
+  U.from='';U.to='';
+  openModal({title:sname(id)+' · Tedarikçi ekstresi',wide:true,noFoot:true,noFocus:true,
+    body:`<div class="tools"><label class="f">Başlangıç<input type="date" id="sFrom"></label><label class="f">Bitiş<input type="date" id="sTo"></label><button type="button" class="btn" data-act="sstmt-clear">Tümü</button><span style="flex:1"></span><button type="button" class="btn" data-act="gx-new" data-id="${esc(id)}">Gider ekle</button><button type="button" class="btn primary" data-act="sp-new" data-id="${esc(id)}">Ödeme yap</button></div><div id="stmt">${supStmtHtml(id)}</div>`,
+    onInput:(f,t)=>{if(t.id==='sFrom'||t.id==='sTo'){U.from=$('#sFrom').value;U.to=$('#sTo').value;$('#stmt').innerHTML=supStmtHtml(id)}}});
+  modalCfg.sup=id;
+}
+function vGider(){
+  const L=supLedger().filter(r=>!U.sq||tr(r.s.name).includes(tr(U.sq))).sort((a,b)=>b.bal-a.bal||a.s.name.localeCompare(b.s.name,'tr'));
+  const allL=supLedger(),debt=allL.reduce((a,r)=>a+Math.max(0,r.bal),0),tm=thisMonth();
+  const mBill=S.expenses.filter(e=>e.kind==='firma'&&e.date.slice(0,7)===tm).reduce((a,e)=>a+e.amount,0);
+  const mPaid=S.spay.filter(p=>p.date.slice(0,7)===tm).reduce((a,p)=>a+p.amount,0);
+  const sup=U.gSup||'';
+  const mov=[...S.expenses.filter(e=>e.kind==='firma').map(e=>({id:e.id,k:'g',date:e.date,sup:e.supplier,d:[e.category,e.desc].filter(Boolean).join(' · '),amt:e.amount,by:e.by})),...S.spay.map(p=>({id:p.id,k:'p',date:p.date,sup:p.supplier,d:[p.method,p.note].filter(Boolean).join(' · '),amt:p.amount,by:p.by}))].filter(m=>!sup||m.sup===sup).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0).slice(0,40);
+  return head('Firma Giderleri','Tedarikçi firmalardan aldığınız mal ve hizmetlerin faturaları ve onlara yaptığınız ödemeler. Satıra tıklayınca tedarikçi ekstresi açılır.',
+    `<input type="search" id="sq" placeholder="Tedarikçi ara" value="${esc(U.sq||'')}" aria-label="Tedarikçi ara"><button class="btn" data-act="csv-gider">CSV</button>${addBtn('sup-new','Tedarikçi')}${addBtn('gx-new','Yeni gider')}${addBtn('sp-new','Ödeme yap')}`)+
+  `<div class="grid kpis"><div class="card kpi ${debt>0?'hot':''}"><small>Toplam borcunuz</small><b class="num">${money(debt)}</b><em>${allL.filter(r=>r.bal>0.005).length} tedarikçiye</em></div><div class="card kpi"><small>Bu ay gider (fatura)</small><b class="num">${money(mBill)}</b><em>${mLabel(tm)}</em></div><div class="card kpi ok"><small>Bu ay ödeme</small><b class="num">${money(mPaid)}</b><em>tedarikçilere</em></div><div class="card kpi"><small>Tedarikçi</small><b class="num">${S.suppliers.length}</b><em>kayıtlı firma</em></div></div>`+
+  (L.length?`<div class="card tw"><table><thead><tr><th>Tedarikçi</th><th class="r">Toplam gider</th><th class="r">Ödenen</th><th class="r">Kalan borç</th><th>Son işlem</th><th></th></tr></thead><tbody>${L.map(r=>`<tr class="click" tabindex="0" data-act="sstmt" data-id="${esc(r.s.id)}"><td><b>${esc(r.s.name)}</b></td><td class="r num">${money(r.bill)}</td><td class="r num">${money(r.paid)}</td><td class="r num ${r.bal>0.005?'neg':r.bal<-0.005?'pos':''}"><b>${money(r.bal)}</b></td><td class="num">${r.last?D(r.last):'—'}</td><td class="row-actions"><button class="btn ghost" data-act="sp-new" data-id="${esc(r.s.id)}">Ödeme</button><button class="btn ghost" data-act="sup-edit" data-id="${esc(r.s.id)}">Düzenle</button><button class="btn ghost" data-act="sup-del" data-id="${esc(r.s.id)}">Sil</button></td></tr>`).join('')}</tbody></table></div>`:emptyCard('Tedarikçi yok','“Tedarikçi” düğmesiyle mal aldığınız firmaları ekleyin; ardından fatura ve ödemelerini girin.'))+
+  (S.suppliers.length?`<section class="card"><header><h2>Son hareketler</h2><select id="gSup" aria-label="Tedarikçi">${`<option value="">Tüm tedarikçiler</option>`+sortedSup().map(s=>`<option value="${esc(s.id)}"${s.id===sup?' selected':''}>${esc(s.name)}</option>`).join('')}</select></header>${mov.length?`<div class="tw"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Tedarikçi</th><th>Açıklama</th><th class="r">Tutar</th><th>Giren</th><th></th></tr></thead><tbody>${mov.map(m=>`<tr><td class="num">${D(m.date)}</td><td><span class="pill ${m.k==='p'?'good':''}">${m.k==='p'?'Ödeme':'Gider'}</span></td><td>${esc(sname(m.sup))}</td><td>${esc(m.d)}</td><td class="r num"><b>${money(m.amt)}</b></td><td class="by">${esc(m.by||'')}</td><td class="row-actions"><button class="btn ghost" data-act="${m.k==='p'?'sp':'gx'}-edit" data-id="${esc(m.id)}">Düzenle</button><button class="btn ghost" data-act="${m.k==='p'?'sp':'gx'}-del" data-id="${esc(m.id)}">Sil</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><b>Hareket yok</b>Gider ya da ödeme girdikçe burada listelenir.</div>'}</section>`:'');
+}
+
+function cashFlow(){
+  const mo=new Map(),g=m=>mo.get(m)||(mo.set(m,{m,sales:0,coll:0,nx:0,gx:0,gp:0}),mo.get(m));
+  S.sales.forEach(s=>{const r=g(s.date.slice(0,7));r.sales+=amt(s);r.coll+=s.paid||0});
+  S.payments.forEach(p=>{g(p.date.slice(0,7)).coll+=p.amount});
+  S.expenses.forEach(e=>{const r=g(e.date.slice(0,7));if(e.kind==='nakit')r.nx+=e.amount;else r.gx+=e.amount});
+  S.spay.forEach(p=>{g(p.date.slice(0,7)).gp+=p.amount});
+  return [...mo.values()].sort((a,b)=>a.m<b.m?1:-1).map(r=>({...r,net:r.coll-r.nx-r.gp}));
+}
+function vGelirGider(){
+  const rows=cashFlow();
+  if(!rows.length)return '';
+  const t=rows.reduce((a,r)=>({sales:a.sales+r.sales,coll:a.coll+r.coll,nx:a.nx+r.nx,gx:a.gx+r.gx,gp:a.gp+r.gp,net:a.net+r.net}),{sales:0,coll:0,nx:0,gx:0,gp:0,net:0});
+  const cell=v=>`<td class="r num">${money(v)}</td>`;
+  return `<section class="card"><header><h2>Aylık gelir ve gider</h2><span>Net nakit = tahsilat − nakit gider − tedarikçi ödemesi</span></header><div class="tw"><table><thead><tr><th>Ay</th><th class="r">Satış</th><th class="r">Tahsilat</th><th class="r">Nakit gider</th><th class="r">Firma gideri</th><th class="r">Firma ödemesi</th><th class="r">Net nakit</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(mLabel(r.m))}</td>${cell(r.sales)}${cell(r.coll)}${cell(r.nx)}${cell(r.gx)}${cell(r.gp)}<td class="r num ${r.net<0?'neg':'pos'}"><b>${money(r.net)}</b></td></tr>`).join('')}</tbody><tfoot><tr><td>Toplam</td>${cell(t.sales)}${cell(t.coll)}${cell(t.nx)}${cell(t.gx)}${cell(t.gp)}<td class="r num ${t.net<0?'neg':'pos'}">${money(t.net)}</td></tr></tfoot></table></div></section>`;
+}
+
+const RENDER={ozet:vOzet,satis:vSatis,hizli:vHizli,firma:vFirma,menu:vMenu,fiyat:vFiyat,cari:vCari,aysonu:vAysonu,tahsilat:vTahsilat,nakit:vNakit,gider:vGider,rapor:vRapor,yedek:vYedek,kullanici:vKullanici};
+const COUNT={nakit:()=>S.expenses.filter(e=>e.kind==='nakit').length,gider:()=>S.suppliers.length,satis:()=>S.sales.length,firma:()=>S.firms.length,menu:()=>S.menus.length,tahsilat:()=>S.payments.length,kullanici:()=>S.users.length};
 const visibleViews=()=>VIEWS.filter(([k])=>k==='kullanici'?Auth.owner:k==='yedek'?can('admin'):(k==='hizli'||k==='aysonu')?can('write'):true);
 
 /* ---------- yedek ---------- */
@@ -579,6 +716,9 @@ function backupData(){
     prices:S.prices.map(p=>({id:p.id,firm:p.firm,menu:p.menu,price:p.price})),
     sales:S.sales.map(s=>({id:s.id,date:s.date,firm:s.firm,menu:s.menu,qty:s.qty,price:s.price,paid:s.paid||0})),
     payments:S.payments.map(p=>({id:p.id,date:p.date,firm:p.firm,amount:p.amount,method:p.method,note:p.note})),
+    suppliers:S.suppliers.map(x=>({id:x.id,name:x.name,phone:x.phone})),
+    expenses:S.expenses.map(e=>({id:e.id,kind:e.kind,date:e.date,supplier:e.supplier||null,category:e.category,desc:e.desc,amount:e.amount,by:e.by})),
+    supplierPayments:S.spay.map(p=>({id:p.id,date:p.date,supplier:p.supplier,amount:p.amount,method:p.method,note:p.note,by:p.by})),
     migratedV2:true
   };
 }
@@ -608,23 +748,26 @@ function vYedek(){
     :U.bkState!=='ok'?''
     :stale?`<div class="note">${auto?`Son otomatik yedek ${ago(auto.taken_at)} alındı. 36 saatten uzun süredir yenisi alınmamış. Supabase'de zamanlayıcının (pg_cron) açık olduğunu kontrol edin.`:'Henüz otomatik yedek yok. İlk yedek gece 05:00\'te alınır; hemen denemek için "Şimdi yedekle"ye basın.'}</div>`
     :`<div class="stmt-note">Otomatik yedekleme çalışıyor. Son yedek: <b>${stamp(auto.taken_at)}</b> (${ago(auto.taken_at)}).</div>`;
-  const rows=bl.map(b=>{const c=b.counts||{};return `<tr><td class="num">${stamp(b.taken_at)}</td><td><span class="pill ${b.kind==='otomatik'?'good':b.kind==='oncesi'?'warn':''}">${KIND[b.kind]||b.kind}</span></td><td>${int(c.firms)} firma · ${int(c.sales)} satış · ${int(c.payments)} tahsilat</td><td>${esc(b.note)}</td><td class="row-actions"><button class="btn ghost" data-act="bk-dl" data-id="${b.id}">İndir</button>${Auth.owner?`<button class="btn ghost" data-act="bk-restore" data-id="${b.id}">Geri yükle</button>`:''}</td></tr>`}).join('');
+  const rows=bl.map(b=>{const c=b.counts||{};return `<tr><td class="num">${stamp(b.taken_at)}</td><td><span class="pill ${b.kind==='otomatik'?'good':b.kind==='oncesi'?'warn':''}">${KIND[b.kind]||b.kind}</span></td><td>${int(c.firms)} firma · ${int(c.sales)} satış · ${int(c.payments)} tahsilat${c.expenses!==undefined?` · ${int(c.expenses)} gider`:''}</td><td>${esc(b.note)}</td><td class="row-actions"><button class="btn ghost" data-act="bk-dl" data-id="${b.id}">İndir</button>${Auth.owner?`<button class="btn ghost" data-act="bk-restore" data-id="${b.id}">Geri yükle</button>`:''}</td></tr>`}).join('');
   return head('Yedek','Kayıtlar her gece otomatik yedeklenir. Yedekleri indirebilir, istediğiniz bir ana geri dönebilirsiniz.',can('admin')?'<button class="btn primary" data-act="bk-now">Şimdi yedekle</button>':'')+
   banner+
   `<section class="card"><header><h2>Otomatik ve elle alınan yedekler</h2><span>Son 35 gün ve her ayın ilk günü</span></header>${bl.length?`<div class="tw"><table><thead><tr><th>Tarih</th><th>Tür</th><th>İçerik</th><th>Not</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="empty"><b>${U.bkState==='ok'?'Henüz yedek yok':'Yükleniyor'}</b>${U.bkState==='ok'?'Yedekler burada listelenir.':''}</div>`}</section>
   <div class="grid two">
-    <section class="card pad"><h2>Bilgisayara indir</h2><p class="hint" style="margin:6px 0 14px">Şu anki tüm kayıtları (${S.sales.length} satış, ${S.payments.length} tahsilat, ${S.firms.length} firma) JSON dosyası olarak indirir. Otomatik yedekler Supabase projesinin içinde durur; ayda bir bu dosyayı da saklamanız önerilir.</p><button class="btn" data-act="bk-export">Dosyayı indir</button></section>
+    <section class="card pad"><h2>Bilgisayara indir</h2><p class="hint" style="margin:6px 0 14px">Şu anki tüm kayıtları (${S.sales.length} satış, ${S.payments.length} tahsilat, ${S.expenses.length} gider, ${S.firms.length} firma) JSON dosyası olarak indirir. Otomatik yedekler Supabase projesinin içinde durur; ayda bir bu dosyayı da saklamanız önerilir.</p><button class="btn" data-act="bk-export">Dosyayı indir</button></section>
     ${Auth.owner?`<section class="card pad"><h2>Dosyadan yükle</h2><p class="hint" style="margin:6px 0 14px">Bir yedek dosyasındaki kayıtlar eklenir; aynı kimlikli kayıtlar yedekteki haline döner. Hiçbir kayıt silinmez.</p><div class="tools"><input type="file" id="bkFile" accept="application/json,.json" aria-label="Yedek dosyası"><button class="btn" data-act="bk-import">Yükle</button></div></section>`:''}
   </div>`;
 }
 async function importData(j){
   const arr=k=>Array.isArray(j[k])?j[k]:[];
   const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const set=[['st_firms',arr('firms').map(x=>({id:x.id,name:x.name,phone:x.phone||''}))],
+  const set=[['st_suppliers',arr('suppliers').map(x=>({id:x.id,name:x.name,phone:x.phone||''}))],
+    ['st_firms',arr('firms').map(x=>({id:x.id,name:x.name,phone:x.phone||''}))],
     ['st_menus',arr('menus').map(x=>({id:x.id,name:x.name}))],
     ['st_prices',arr('prices').map(x=>({id:x.id,firm_id:x.firm,menu_id:x.menu,price:+x.price}))],
     ['st_sales',arr('sales').map(x=>({id:x.id,date:x.date,firm_id:x.firm,menu_id:x.menu,qty:+x.qty,price:+x.price,paid:+x.paid||0,by_name:x.by||'Yedek'}))],
-    ['st_payments',arr('payments').map(x=>({id:x.id,date:x.date,firm_id:x.firm,amount:+x.amount,method:x.method||'',note:x.note||'',by_name:x.by||'Yedek'}))]];
+    ['st_payments',arr('payments').map(x=>({id:x.id,date:x.date,firm_id:x.firm,amount:+x.amount,method:x.method||'',note:x.note||'',by_name:x.by||'Yedek'}))],
+    ['st_expenses',arr('expenses').map(x=>({id:x.id,kind:x.kind,date:x.date,supplier_id:x.kind==='firma'?x.supplier:null,category:x.category||'',description:x.desc||'',amount:+x.amount,by_name:x.by||'Yedek'}))],
+    ['st_supplier_payments',arr('supplierPayments').map(x=>({id:x.id,date:x.date,supplier_id:x.supplier,amount:+x.amount,method:x.method||'',note:x.note||'',by_name:x.by||'Yedek'}))]];
   const total=set.reduce((a,[,r])=>a+r.length,0);
   if(!total){toast('Dosyada kayıt bulunamadı');return false}
   if(set.some(([,r])=>r.some(x=>!uuid.test(x.id)))){toast('Dosyadaki kayıt kimlikleri geçersiz');return false}
@@ -717,6 +860,25 @@ document.addEventListener('click',e=>{
     case 'bk-restore':restoreModal(id);break;
     case 'bk-export':download(`satis-cari-yedek-${iso(new Date())}.json`,JSON.stringify(backupData(),null,2),'application/json');toast('Yedek indirildi');break;
     case 'bk-import':bkImport();break;
+    case 'nx-new':expenseModal(null,'nakit');break;
+    case 'nx-edit':expenseModal(byId(S.expenses,id));break;
+    case 'nx-del':{const e=byId(S.expenses,id);confirmDel('Gideri sil',`${D(e.date)} · ${esc(e.category)} · ${money(e.amount)} silinecek.`,()=>del('expenses',id));break}
+    case 'gx-new':{const f=id;if(modalCfg)closeModal();expenseModal(null,'firma',f);break}
+    case 'gx-edit':expenseModal(byId(S.expenses,id));break;
+    case 'gx-del':{const e=byId(S.expenses,id);confirmDel('Gideri sil',`${esc(sname(e.supplier))} · ${D(e.date)} · ${money(e.amount)} silinecek.`,()=>del('expenses',id));break}
+    case 'sp-new':{const f=id;if(modalCfg)closeModal();spayModal(null,f);break}
+    case 'sp-edit':spayModal(byId(S.spay,id));break;
+    case 'sp-del':{const p=byId(S.spay,id);confirmDel('Ödemeyi sil',`${esc(sname(p.supplier))} · ${D(p.date)} · ${money(p.amount)} silinecek.`,()=>del('spay',id));break}
+    case 'sup-new':supModal();break;
+    case 'sup-edit':supModal(byId(S.suppliers,id));break;
+    case 'sup-del':{
+      if(S.expenses.some(e=>e.supplier===id)||S.spay.some(p=>p.supplier===id)){toast('Gideri veya ödemesi olan tedarikçi silinemez');break}
+      confirmDel('Tedarikçiyi sil',`${esc(sname(id))} silinecek.`,()=>del('suppliers',id));break}
+    case 'sstmt':openSupStatement(id);break;
+    case 'sstmt-clear':U.from=U.to='';$('#sFrom').value=$('#sTo').value='';$('#stmt').innerHTML=supStmtHtml(modalCfg.sup);break;
+    case 'g-day':{const n=+id;U.gMonth=n===0?thisMonth():mShift(U.gMonth||thisMonth(),n);render();break}
+    case 'csv-nakit':{const m=U.gMonth||thisMonth();saveCsv(`nakit-giderler-${m}.csv`,[['Tarih','Kategori','Açıklama','Tutar','Giren'],...S.expenses.filter(e=>e.kind==='nakit'&&e.date.slice(0,7)===m).sort((a,b)=>a.date<b.date?-1:1).map(e=>[e.date,e.category,e.desc,e.amount,e.by])]);break}
+    case 'csv-gider':saveCsv('firma-giderleri.csv',[['Tedarikçi','Toplam gider','Ödenen','Kalan borç','Son işlem'],...supLedger().sort((a,b)=>b.bal-a.bal).map(r=>[r.s.name,r.bill,r.paid,r.bal,r.last])]);break;
     case 'user-new':userModal();break;
     case 'user-edit':userModal(byId(S.users,id));break;
     case 'user-toggle':{
@@ -749,11 +911,16 @@ document.addEventListener('input',e=>{
   const t=e.target;if(t.closest('#modal'))return;
   if(t.id==='q'){U.q=t.value;render()}
   else if(t.id==='payQ'){U.payQ=t.value;render()}
+  else if(t.id==='gq'){U.gq=t.value;render()}
+  else if(t.id==='sq'){U.sq=t.value;render()}
 });
 document.addEventListener('change',async e=>{
   const t=e.target;if(t.closest('#modal'))return;
   if(t.id==='dayIn'&&t.value){U.date=t.value;render()}
   else if(t.id==='sortSel'){U.sort=t.value;render()}
+  else if(t.id==='gMonth'&&t.value){U.gMonth=t.value;render()}
+  else if(t.id==='gCat'){U.gCat=t.value;render()}
+  else if(t.id==='gSup'){U.gSup=t.value;render()}
   else if(t.id==='dueSel'){if(await put('settings','app',{dueDays:+t.value}))toast('Vade süresi güncellendi')}
   else if(t.id==='qDate'&&t.value){U.qDate=t.value;render()}
   else if(t.id==='qMenu'){U.qMenu=t.value;render()}

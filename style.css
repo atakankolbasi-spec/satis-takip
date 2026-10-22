@@ -161,7 +161,7 @@ tfoot td{font-weight:700;background:var(--soft)}
 .sync{margin-top:0;border-top:0;padding-top:0}
 .ro [data-act$="-new"],.ro [data-act$="-edit"],.ro [data-act$="-del"],.ro [data-act="stmt-pay"],.ro [data-act="m-pay"],.ro [data-act="m-bulk"]{display:none}
 .nodel [data-act$="-del"]{display:none}
-.noadm [data-act^="firm-"],.noadm [data-act^="menu-"]{display:none}
+.noadm [data-act^="firm-"],.noadm [data-act^="menu-"],.noadm [data-act^="sup-"]{display:none}
 /* hızlı giriş ve ay sonu */
 .qt td{padding:7px 14px}
 .qt input.qin{width:100%;max-width:120px;text-align:right}
