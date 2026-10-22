@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="theme-color" content="#16233a">
+<meta name="robots" content="noindex,nofollow">
+<title>Satış Takip</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside class="side" aria-label="Ana menü">
+  <div class="brand"><div class="mark">ST</div><div><b>Satış Takip</b><small>CARİ VE TAHSİLAT</small></div></div>
+  <nav class="nav" id="nav"></nav>
+  <div class="sidefoot"><div class="who" id="who"></div><div class="sync"><span class="dot off" id="dot"></span><span id="syncTxt">Bağlanıyor</span></div></div>
+</aside>
+<main class="main" id="main" aria-live="polite"></main>
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"><div class="sheet" id="sheet"></div></div>
+<div id="toast" role="status"></div>
+<div id="login" hidden>
+  <form class="lcard" id="lForm" autocomplete="on">
+    <div class="brand"><div class="mark">ST</div><div><b>Satış Takip</b><small>CARİ VE TAHSİLAT</small></div></div>
+    <h1>Giriş yap</h1>
+    <label class="f">Kullanıcı adı<input type="text" id="lUser" autocomplete="username" autocapitalize="none" required></label>
+    <label class="f">Şifre<input type="password" id="lPass" autocomplete="current-password" required></label>
+    <p class="lerr" id="lErr" role="alert"></p>
+    <button class="btn primary" type="submit" id="lBtn" style="justify-content:center">Giriş yap</button>
+    <p class="hint" id="lHint"></p>
+  </form>
+</div>
+<script src="config.js"></script>
+<script src="vendor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
