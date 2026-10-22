@@ -17,7 +17,7 @@ Yetkiler tarayıcıda değil, veritabanı kurallarıyla (RLS) zorlanır: `supaba
 1. **Supabase projesi açın** (supabase.com, ücretsiz plan yeter). Bu proje yalnızca Satış Takip içindir.
 2. **Authentication > Sign In / Providers > Email**: *Confirm email* seçeneğini **kapatın**.
    (Kayıt olma seçeneği açık kalmalı. Ana hesap, kullanıcıları siteden bu yolla açar. Profili olmayan bir hesap hiçbir veriyi göremez.)
-3. **SQL Editor**'de `supabase/kurulum.sql` dosyasının tamamını çalıştırın.
+3. **SQL Editor**'de `supabase/kurulum.sql`, ardından `supabase/yedekleme.sql` dosyasının tamamını çalıştırın.
 4. **Authentication > Users > Add user**: ana hesabın e-postasını ve şifresini girin, *Auto Confirm User* işaretli olsun.
    E-posta, `config.js` içindeki `emailTemplate` şablonunun kullanıcı adınızla doldurulmuş halidir.
    Örnek: şablon `adiniz+{u}@gmail.com`, kullanıcı adı `ana` ise e-posta `adiniz+ana@gmail.com`.
@@ -33,5 +33,6 @@ Yetkiler tarayıcıda değil, veritabanı kurallarıyla (RLS) zorlanır: `supaba
 - `config.js` içindeki anahtar herkese açık olacak şekilde tasarlanmıştır; veriyi koruyan şey RLS kurallarıdır. **service_role** anahtarını asla repoya koymayın.
 - Kullanıcı adları Supabase'de e-postaya çevrilir; bu adreslere e-posta gönderilmez.
 - Ana hesap, bir kullanıcının şifresini Kullanıcılar > Düzenle'den sıfırlayabilir. Herkes kendi şifresini "Şifremi değiştir" ile değiştirebilir.
-- Düzenli **Yedek > Yedeği indir** almanız önerilir.
+- **Otomatik yedekleme:** `supabase/yedekleme.sql` dosyasını SQL Editor'de bir kez çalıştırın. Her gece 05:00'te (Türkiye saati) tüm kayıtların kopyası alınır; son 35 günün yedekleri ile her ayın ilk günü alınanlar saklanır. Yedek sekmesinden listelenir, indirilir ve geri yüklenir (geri yükleme yalnızca ana hesapta; işlemden önce bugünün yedeği otomatik alınır). Zamanlayıcı için Supabase'de **Database > Extensions > pg_cron** açık olmalı; dosya bunu kendisi açmayı dener.
+- Otomatik yedekler aynı Supabase projesinin içindedir. Proje silinirse onlar da gider; ayda bir **Yedek > Dosyayı indir** ile bilgisayarınıza da bir kopya alın.
 - Yazı tipleri (Inter, Plus Jakarta Sans) SIL Open Font License ile dağıtılır; lisans metinleri `fonts/` içindedir. `vendor.js`, `@supabase/supabase-js` (MIT) paketinin derlenmiş halidir.

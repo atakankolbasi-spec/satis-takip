@@ -375,7 +375,7 @@ function startData(){
   channel.subscribe();
 }
 function stopData(){
-  COLS.forEach(c=>{S[c]=[];delete ready[c]});
+  COLS.forEach(c=>{S[c]=[];delete ready[c]});S.backups=[];U.bkState='';
   if(channel){sb.removeChannel(channel);channel=null}
 }
 
@@ -587,17 +587,37 @@ function download(name,text,type){
   const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
+const KIND={otomatik:'Otomatik',elle:'Elle',oncesi:'Geri yükleme öncesi'};
+const ago=t=>{const h=(Date.now()-new Date(t))/36e5;return h<1?'az önce':h<24?Math.floor(h)+' saat önce':Math.floor(h/24)+' gün önce'};
+const stamp=t=>new Date(t).toLocaleString('tr-TR',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+async function loadBackups(){
+  if(!can('admin'))return;
+  const {data,error}=await sb.from('st_backups').select('id,taken_at,kind,note,counts').order('taken_at',{ascending:false}).limit(60);
+  S.backups=error?[]:data;U.bkState=error?'error':'ok';schedule();
+}
+async function backupPayload(id){
+  const {data,error}=await sb.from('st_backups').select('payload,taken_at,kind').eq('id',id).maybeSingle();
+  if(error||!data){toast('Yedek okunamadı');return null}
+  return data;
+}
 function vYedek(){
-  return head('Yedek','Tüm firma, fiyat, satış ve tahsilat kayıtlarını dosyaya alın ya da önceki bir yedeği geri yükleyin.')+
-  `<div class="grid two">
-    <section class="card pad"><h2>Yedek al</h2><p class="hint" style="margin:6px 0 14px">${S.sales.length} satış, ${S.payments.length} tahsilat, ${S.firms.length} firma kaydı tek bir JSON dosyasına yazılır. Düzenli aralıklarla almanız önerilir.</p><button class="btn primary" data-act="bk-export">Yedeği indir</button></section>
-    ${Auth.owner?`<section class="card pad"><h2>Yedekten yükle</h2><p class="hint" style="margin:6px 0 14px">Aynı kimlikli kayıtlar güncellenir, olmayanlar eklenir. Hiçbir kayıt silinmez.</p><div class="tools"><input type="file" id="bkFile" accept="application/json,.json" aria-label="Yedek dosyası"><button class="btn" data-act="bk-import">Yükle</button></div></section>`:''}
+  if(can('admin')&&!U.bkState){U.bkState='loading';loadBackups()}
+  const bl=S.backups||[],auto=bl.find(b=>b.kind==='otomatik');
+  const stale=!auto||(Date.now()-new Date(auto.taken_at))>36*36e5;
+  const banner=U.bkState==='error'?'<div class="note">Yedek listesi okunamadı. supabase/yedekleme.sql dosyası Supabase\'de çalıştırılmamış olabilir.</div>'
+    :U.bkState!=='ok'?''
+    :stale?`<div class="note">${auto?`Son otomatik yedek ${ago(auto.taken_at)} alındı. 36 saatten uzun süredir yenisi alınmamış. Supabase'de zamanlayıcının (pg_cron) açık olduğunu kontrol edin.`:'Henüz otomatik yedek yok. İlk yedek gece 05:00\'te alınır; hemen denemek için "Şimdi yedekle"ye basın.'}</div>`
+    :`<div class="stmt-note">Otomatik yedekleme çalışıyor. Son yedek: <b>${stamp(auto.taken_at)}</b> (${ago(auto.taken_at)}).</div>`;
+  const rows=bl.map(b=>{const c=b.counts||{};return `<tr><td class="num">${stamp(b.taken_at)}</td><td><span class="pill ${b.kind==='otomatik'?'good':b.kind==='oncesi'?'warn':''}">${KIND[b.kind]||b.kind}</span></td><td>${int(c.firms)} firma · ${int(c.sales)} satış · ${int(c.payments)} tahsilat</td><td>${esc(b.note)}</td><td class="row-actions"><button class="btn ghost" data-act="bk-dl" data-id="${b.id}">İndir</button>${Auth.owner?`<button class="btn ghost" data-act="bk-restore" data-id="${b.id}">Geri yükle</button>`:''}</td></tr>`}).join('');
+  return head('Yedek','Kayıtlar her gece otomatik yedeklenir. Yedekleri indirebilir, istediğiniz bir ana geri dönebilirsiniz.',can('admin')?'<button class="btn primary" data-act="bk-now">Şimdi yedekle</button>':'')+
+  banner+
+  `<section class="card"><header><h2>Otomatik ve elle alınan yedekler</h2><span>Son 35 gün ve her ayın ilk günü</span></header>${bl.length?`<div class="tw"><table><thead><tr><th>Tarih</th><th>Tür</th><th>İçerik</th><th>Not</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="empty"><b>${U.bkState==='ok'?'Henüz yedek yok':'Yükleniyor'}</b>${U.bkState==='ok'?'Yedekler burada listelenir.':''}</div>`}</section>
+  <div class="grid two">
+    <section class="card pad"><h2>Bilgisayara indir</h2><p class="hint" style="margin:6px 0 14px">Şu anki tüm kayıtları (${S.sales.length} satış, ${S.payments.length} tahsilat, ${S.firms.length} firma) JSON dosyası olarak indirir. Otomatik yedekler Supabase projesinin içinde durur; ayda bir bu dosyayı da saklamanız önerilir.</p><button class="btn" data-act="bk-export">Dosyayı indir</button></section>
+    ${Auth.owner?`<section class="card pad"><h2>Dosyadan yükle</h2><p class="hint" style="margin:6px 0 14px">Bir yedek dosyasındaki kayıtlar eklenir; aynı kimlikli kayıtlar yedekteki haline döner. Hiçbir kayıt silinmez.</p><div class="tools"><input type="file" id="bkFile" accept="application/json,.json" aria-label="Yedek dosyası"><button class="btn" data-act="bk-import">Yükle</button></div></section>`:''}
   </div>`;
 }
-async function bkImport(){
-  const f=$('#bkFile')&&$('#bkFile').files[0];
-  if(!f){toast('Önce bir yedek dosyası seçin');return}
-  let j;try{j=JSON.parse(await f.text())}catch(e){toast('Dosya okunamadı, geçerli bir yedek değil');return}
+async function importData(j){
   const arr=k=>Array.isArray(j[k])?j[k]:[];
   const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const set=[['st_firms',arr('firms').map(x=>({id:x.id,name:x.name,phone:x.phone||''}))],
@@ -606,19 +626,40 @@ async function bkImport(){
     ['st_sales',arr('sales').map(x=>({id:x.id,date:x.date,firm_id:x.firm,menu_id:x.menu,qty:+x.qty,price:+x.price,paid:+x.paid||0,by_name:x.by||'Yedek'}))],
     ['st_payments',arr('payments').map(x=>({id:x.id,date:x.date,firm_id:x.firm,amount:+x.amount,method:x.method||'',note:x.note||'',by_name:x.by||'Yedek'}))]];
   const total=set.reduce((a,[,r])=>a+r.length,0);
-  if(!total){toast('Dosyada kayıt bulunamadı');return}
-  if(set.some(([,r])=>r.some(x=>!uuid.test(x.id)))){toast('Dosyadaki kayıt kimlikleri geçersiz');return}
-  const btn=document.querySelector('[data-act="bk-import"]');if(btn)btn.disabled=true;
+  if(!total){toast('Dosyada kayıt bulunamadı');return false}
+  if(set.some(([,r])=>r.some(x=>!uuid.test(x.id)))){toast('Dosyadaki kayıt kimlikleri geçersiz');return false}
   let n=0;
   for(const [t,rows] of set){
     for(let i=0;i<rows.length;i+=500){
       const {error}=await sb.from(t).upsert(rows.slice(i,i+500));
-      if(error){toast(`${t.replace('st_','')} yüklenemedi: ${errMsg(error)}`);if(btn)btn.disabled=false;return}
+      if(error){toast(`${t.replace('st_','')} yüklenemedi: ${errMsg(error)}`);return false}
       n+=Math.min(500,rows.length-i);toast(`Yükleniyor… ${n} / ${total}`);
     }
   }
   await Promise.all(COLS.filter(c=>c!=='users').map(reload));
-  toast(`${total} kayıt yüklendi`);render();
+  toast(`${total} kayıt yüklendi`);return true;
+}
+async function bkImport(){
+  const f=$('#bkFile')&&$('#bkFile').files[0];
+  if(!f){toast('Önce bir yedek dosyası seçin');return}
+  let j;try{j=JSON.parse(await f.text())}catch(e){toast('Dosya okunamadı, geçerli bir yedek değil');return}
+  const btn=document.querySelector('[data-act="bk-import"]');if(btn)btn.disabled=true;
+  await importData(j);
+  if(btn)btn.disabled=false;render();
+}
+function restoreModal(id){
+  const b=(S.backups||[]).find(x=>String(x.id)===String(id));if(!b)return;
+  const c=b.counts||{};
+  openModal({title:'Yedeğe geri dön',submit:'Geri yükle',danger:true,noFocus:true,
+    body:`<p style="margin:0"><b>${stamp(b.taken_at)}</b> tarihli yedek (${int(c.firms)} firma, ${int(c.sales)} satış, ${int(c.payments)} tahsilat) geri yüklenecek.</p>
+    <div class="note">Yedekte bulunan kayıtlar yedekteki haline döner; sonradan silinmiş olanlar geri gelir. Yedekten sonra eklenen yeni kayıtlar silinmez. İşlemden hemen önce bugünün halinin yedeği otomatik alınır.</div>`,
+    onSubmit:async()=>{
+      const {error}=await sb.rpc('st_backup_now',{p_kind:'oncesi',p_note:'Geri yüklemeden önce'});
+      if(error){toast('Önce yedek alınamadı, geri yükleme yapılmadı');return false}
+      const p=await backupPayload(id);if(!p)return false;
+      const ok=await importData(p.payload);
+      if(ok){await loadBackups();toast('Yedek geri yüklendi')}
+      return ok}});
 }
 
 function render(){
@@ -671,6 +712,9 @@ document.addEventListener('click',e=>{
     case 'stmt-pay':{const f=id;closeModal();payModal(null,f);break}
     case 'logout':sb.auth.signOut().then(()=>{setUser(null);stopData();render()});break;
     case 'pw-change':pwModal();break;
+    case 'bk-now':sb.rpc('st_backup_now',{p_kind:'elle',p_note:'Elle alındı'}).then(async({error})=>{if(error)toast(errMsg(error));else{await loadBackups();toast('Yedek alındı')}});break;
+    case 'bk-dl':backupPayload(id).then(p=>{if(p){download(`satis-cari-yedek-${p.taken_at.slice(0,10)}-${p.kind}.json`,JSON.stringify(p.payload,null,2),'application/json');toast('Yedek indirildi')}});break;
+    case 'bk-restore':restoreModal(id);break;
     case 'bk-export':download(`satis-cari-yedek-${iso(new Date())}.json`,JSON.stringify(backupData(),null,2),'application/json');toast('Yedek indirildi');break;
     case 'bk-import':bkImport();break;
     case 'user-new':userModal();break;
